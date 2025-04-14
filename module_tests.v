@@ -27,6 +27,12 @@ module tb_mips;
     reg [1:0] mux4_sel;
     wire [31:0] mux4_out;
     
+    // Sinais para o Register File
+    reg [4:0] rf_read_reg1, rf_read_reg2, rf_write_reg;
+    reg [31:0] rf_write_data;
+    wire [31:0] rf_read_data1, rf_read_data2;
+    reg rf_we;
+    
     // Instancia dos módulos já implementados:
     program_counter uut_pc (
         .clk(clk),
@@ -66,6 +72,17 @@ module tb_mips;
         .in3(mux4_in3),
         .sel(mux4_sel),
         .out(mux4_out)
+    );
+    
+    register_file uut_rf (
+        .clk(clk),
+        .we(rf_we),
+        .read_reg1(rf_read_reg1),
+        .read_reg2(rf_read_reg2),
+        .write_reg(rf_write_reg),
+        .write_data(rf_write_data),
+        .read_data1(rf_read_data1),
+        .read_data2(rf_read_data2)
     );
     
     // Geração do clock (período de 10 ns)
@@ -170,6 +187,28 @@ module tb_mips;
         #10;
         $display("Sign Extender - Entrada: 0x%04h, Saída: 0x%08h", se_in, se_out);
         
+        // ==================================================
+        // Teste do Register File
+        // ==================================================
+        $display("\n===== Teste do Register File =====");
+        rf_we = 1;
+        rf_write_reg = 5;
+        rf_write_data = 32'h12345678;
+        #10;
+        rf_we = 0;
+        rf_read_reg1 = 5;
+        #10;
+        $display("Reg[5] = 0x%08h", rf_read_data1);
+        
+        rf_we = 1;
+        rf_write_reg = 10;
+        rf_write_data = 32'hDEADBEEF;
+        #10;
+        rf_we = 0;
+        rf_read_reg1 = 5;
+        rf_read_reg2 = 10;
+        #10;
+        $display("Reg[5] = 0x%08h, Reg[10] = 0x%08h", rf_read_data1, rf_read_data2);
         
         $finish;
     end

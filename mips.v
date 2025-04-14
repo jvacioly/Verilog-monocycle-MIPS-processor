@@ -1,5 +1,7 @@
 //Definir unidade de clock
-// Módulo do Program Counter (PC)
+// ==================================================
+// Program Counter (PC)
+// ==================================================
 module program_counter (
     input wire clk, // Clock
     input wire reset, // Reset
@@ -12,8 +14,11 @@ module program_counter (
             pc <= pc + 32'd4; // Incremento de 4 a cada ciclo
     end
 endmodule
+// ==================================================
 
-// Módulo da Memória de Instruções (ROM)
+// ==================================================
+// Memória de Instrução (ROM)
+// ==================================================
 module instruction_memory (
     input wire [31:0] pc, // Endereço da instrução
     output reg [31:0] instruction // Instrução correspondente
@@ -44,48 +49,11 @@ module instruction_memory (
         instruction = memory[pc[5:2]]; // Endereçamento alinhado de 4 em 4 bytes
     end
 endmodule
+// ==================================================
 
-// Testbench
-module tb_mips;
-    reg clk;
-    reg reset;
-    wire [31:0] pc;
-    wire [31:0] instruction;
-    
-    program_counter uut_pc (
-        .clk(clk),
-        .reset(reset),
-        .pc(pc)
-    );
-    
-    instruction_memory uut_mem (
-        .pc(pc),
-        .instruction(instruction)
-    );
-    
-    // Geração do clock
-    always #5 clk = ~clk; // Clock de período 10 unidades de tempo
-    
-    initial begin
-        $dumpfile("mips.vcd");
-        $dumpvars(0, tb_mips);
-        
-        // Inicialização
-        clk = 0;
-        reset = 1;
-        #10 reset = 0; // Desativa reset após 10 unidades de tempo
-        
-        // Rodar por alguns ciclos
-        repeat (10) begin
-            #10;
-            $display("PC = 0x%08h, Instruction = 0x%08h", pc, instruction);
-        end
-        
-        $finish;
-    end
-endmodule
-
-//Módulo ALU
+// ==================================================
+// ALU
+// ==================================================
 module alu (
     input wire [31:0] a, // Operando A
     input wire [31:0] b, // Operando B
@@ -128,8 +96,11 @@ module alu (
             zero = 0;
     end
 endmodule
+// ==================================================
 
-//Módulo mux 2:1
+// ==================================================
+// Mux 2:1
+// ==================================================
 module mux2to1(
     input wire [31:0] in0,  // Primeira entrada de 32 bits
     input wire [31:0] in1,  // Segunda entrada de 32 bits
@@ -139,8 +110,11 @@ module mux2to1(
     // Se 'sel' for 1, 'out' recebe 'in1'; caso contrário, recebe 'in0'
     assign out = sel ? in1 : in0;
 endmodule
+// ==================================================
 
-//Módulo mux 4:1
+// ==================================================
+// Mux 4:1
+// ==================================================
 module mux4to1 #(
     parameter WIDTH = 32       // Largura dos dados (32 bits por padrão)
 )(
@@ -156,8 +130,11 @@ module mux4to1 #(
                  (sel == 2'b01) ? in1 :
                  (sel == 2'b10) ? in2 : in3;
 endmodule
+// ==================================================
 
-//Extensor de Sinal
+// ==================================================
+// Extensor de Sinal
+// ==================================================
 module sign_extender (
     input  wire [15:0] in,      // Imediato de 16 bits
     output wire [31:0] out      // Imediato estendido para 32 bits
@@ -165,3 +142,40 @@ module sign_extender (
     // Replicação do bit de sinal (in[15]) por 16 vezes, seguido do valor original de 16 bits.
     assign out = {{16{in[15]}}, in};
 endmodule
+// ==================================================
+
+// ==================================================
+// Banco de registradores
+// ==================================================
+module register_file (
+    input wire clk,
+    input wire we,                     // Write Enable
+    input wire [4:0] read_reg1,        // Endereço do primeiro registrador a ser lido
+    input wire [4:0] read_reg2,        // Endereço do segundo registrador a ser lido
+    input wire [4:0] write_reg,        // Endereço do registrador a ser escrito
+    input wire [31:0] write_data,      // Dados a serem escritos
+    output wire [31:0] read_data1,     // Saída dos dados do registrador 1
+    output wire [31:0] read_data2      // Saída dos dados do registrador 2
+);
+
+    reg [31:0] registers [31:0];
+
+    integer i;
+    // Inicializa os registradores (opcional)
+    initial begin
+        for (i = 0; i < 32; i = i + 1)
+            registers[i] = 32'd0;
+    end
+
+    // Escrita no registrador
+    always @(posedge clk) begin
+        if (we)
+            registers[write_reg] <= write_data;
+    end
+
+    // Leitura dos registradores
+    assign read_data1 = registers[read_reg1];
+    assign read_data2 = registers[read_reg2];
+
+endmodule
+// ==================================================
