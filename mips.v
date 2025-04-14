@@ -1,39 +1,35 @@
-//Definir unidade de clock
 // ==================================================
 // Program Counter (PC)
 // ==================================================
 module program_counter (
-    input wire clk, // Clock
-    input wire reset, // Reset
-    output reg [31:0] pc // Registrador do PC
+    input wire clk,
+    input wire reset,
+    input wire [31:0] pc_next,
+    output reg [31:0] pc
 );
     always @(posedge clk or posedge reset) begin
-        if (reset)
-            pc <= 32'd0; // Se resetado, PC volta a 0
-        else
-            pc <= pc + 32'd4; // Incremento de 4 a cada ciclo
+        if (reset) pc <= 32'd0;
+        else pc <= pc_next;
     end
 endmodule
-// ==================================================
 
 // ==================================================
 // Memória de Instrução (ROM)
 // ==================================================
 module instruction_memory (
-    input wire [31:0] pc, // Endereço da instrução
-    output reg [31:0] instruction // Instrução correspondente
+    input wire [31:0] pc,
+    output reg [31:0] instruction
 );
-    reg [31:0] memory [0:15]; // Memória de 16 instruções 
+    reg [31:0] memory [0:15];
     
     initial begin
-        // Carregando algumas instruções
         memory[0]  = 32'h20080001; // addi $t0, $zero, 1
         memory[1]  = 32'h21090002; // addi $t1, $t0, 2
         memory[2]  = 32'h012A4020; // add  $t0, $t1, $t2
         memory[3]  = 32'h00000000; // nop
         memory[4]  = 32'h8C0B0000; // lw   $t3, 0($zero)
         memory[5]  = 32'hAC0C0000; // sw   $t4, 0($zero)
-        memory[6]  = 32'h08000002; // j    0x8
+        memory[6]  = 32'h08000008; // j    0x20 (endereço 8 << 2)
         memory[7]  = 32'h00000000; // nop
         memory[8]  = 32'h340A00FF; // ori  $t2, $zero, 0xFF
         memory[9]  = 32'h00000000; // nop
@@ -46,136 +42,215 @@ module instruction_memory (
     end
     
     always @(*) begin
-        instruction = memory[pc[5:2]]; // Endereçamento alinhado de 4 em 4 bytes
+        instruction = memory[pc[5:2]];
     end
 endmodule
-// ==================================================
 
 // ==================================================
-// ALU
+// Memória de Dados
 // ==================================================
-module alu (
-    input wire [31:0] a, // Operando A
-    input wire [31:0] b, // Operando B
-    input wire [2:0] alu_control, // Código da operação
-    output reg [31:0] result, // Resultado da operação
-    output reg zero // Flag que indica se o resultado é zero
+module data_memory (
+    input wire clk,
+    input wire [31:0] address,
+    input wire [31:0] write_data,
+    input wire mem_read,
+    input wire mem_write,
+    output reg [31:0] read_data
 );
+    reg [31:0] memory [0:255];
+    
+    always @(posedge clk) begin
+        if (mem_write) memory[address[9:2]] <= write_data;
+    end
+    
     always @(*) begin
-        case (alu_control)
-            3'b000: begin
-                result = a & b; // Operação AND
-                $display("AND: %d & %d = %d", a, b, result);
-            end
-            3'b001: begin
-                result = a | b; // Operação OR
-                $display("OR: %d | %d = %d", a, b, result);
-            end
-            3'b010: begin
-                result = a + b; // Soma
-                $display("SOMA: %d + %d = %d", a, b, result);
-            end
-            3'b110: begin
-                result = a - b; // Subtração
-                $display("SUBTRAÇÃO: %d - %d = %d", a, b, result);
-            end
-            3'b111: begin
-                result = (a < b) ? 32'd1 : 32'd0; // Menor que (SLT - Set Less Than)
-                $display("SLT: %d < %d = %d", a, b, result);
-            end
-            default: begin
-                result = 32'd0; // Caso padrão (NOP)
-                $display("NOP");
-            end
-        endcase
-        
-        // Define a flag zero
-        if (result == 32'd0)
-            zero = 1;
-        else
-            zero = 0;
+        read_data = (mem_read) ? memory[address[9:2]] : 32'd0;
     end
 endmodule
-// ==================================================
 
 // ==================================================
-// Mux 2:1
+// Mux 2:1 com Parâmetro de Largura
 // ==================================================
-module mux2to1(
-    input wire [31:0] in0,  // Primeira entrada de 32 bits
-    input wire [31:0] in1,  // Segunda entrada de 32 bits
-    input wire sel,         // Sinal de seleção (1 bit)
-    output wire [31:0] out  // Saída de 32 bits
+module mux2to1 #(
+    parameter WIDTH = 32
+)(
+    input wire [WIDTH-1:0] in0,
+    input wire [WIDTH-1:0] in1,
+    input wire sel,
+    output wire [WIDTH-1:0] out
 );
-    // Se 'sel' for 1, 'out' recebe 'in1'; caso contrário, recebe 'in0'
     assign out = sel ? in1 : in0;
 endmodule
-// ==================================================
-
-// ==================================================
-// Mux 4:1
-// ==================================================
-module mux4to1 #(
-    parameter WIDTH = 32       // Largura dos dados (32 bits por padrão)
-)(
-    input  wire [WIDTH-1:0] in0,  // Primeira entrada
-    input  wire [WIDTH-1:0] in1,  // Segunda entrada
-    input  wire [WIDTH-1:0] in2,  // Terceira entrada
-    input  wire [WIDTH-1:0] in3,  // Quarta entrada
-    input  wire [1:0] sel,        // Sinal de seleção (2 bits)
-    output wire [WIDTH-1:0] out   // Saída selecionada
-);
-    // Se 'sel' for 00, escolhe in0; 01, escolhe in1; 10, escolhe in2; 11, escolhe in3.
-    assign out = (sel == 2'b00) ? in0 :
-                 (sel == 2'b01) ? in1 :
-                 (sel == 2'b10) ? in2 : in3;
-endmodule
-// ==================================================
 
 // ==================================================
 // Extensor de Sinal
 // ==================================================
 module sign_extender (
-    input  wire [15:0] in,      // Imediato de 16 bits
-    output wire [31:0] out      // Imediato estendido para 32 bits
+    input  wire [15:0] in,
+    output wire [31:0] out
 );
-    // Replicação do bit de sinal (in[15]) por 16 vezes, seguido do valor original de 16 bits.
     assign out = {{16{in[15]}}, in};
 endmodule
-// ==================================================
 
 // ==================================================
-// Banco de registradores
+// Unidade de Controle Principal (Atualizada para ori)
+// ==================================================
+module control_unit (
+    input wire [5:0] opcode,
+    output reg reg_dst,
+    output reg alu_src,
+    output reg mem_to_reg,
+    output reg reg_write,
+    output reg mem_read,
+    output reg mem_write,
+    output reg branch,
+    output reg [1:0] alu_op,
+    output reg jump
+);
+    always @(*) begin
+        reg_dst = 0; alu_src = 0; mem_to_reg = 0; reg_write = 0;
+        mem_read = 0; mem_write = 0; branch = 0; alu_op = 2'b00; jump = 0;
+
+        case (opcode)
+            6'b000000: begin // R-type
+                reg_dst = 1; reg_write = 1; alu_op = 2'b10;
+            end
+            6'b100011: begin // lw
+                alu_src = 1; mem_to_reg = 1; reg_write = 1; mem_read = 1;
+            end
+            6'b101011: begin // sw
+                alu_src = 1; mem_write = 1;
+            end
+            6'b000100: begin // beq
+                branch = 1; alu_op = 2'b01;
+            end
+            6'b001000: begin // addi
+                alu_src = 1; reg_write = 1;
+            end
+            6'b001101: begin // ori
+                alu_src = 1; reg_write = 1; alu_op = 2'b00;
+            end
+            6'b000010: begin // j
+                jump = 1;
+            end
+        endcase
+    end
+endmodule
+
+// ==================================================
+// Unidade de Controle da ALU (Atualizada para OR)
+// ==================================================
+module alu_control (
+    input wire [1:0] alu_op,
+    input wire [5:0] funct,
+    output reg [2:0] alu_ctrl
+);
+    always @(*) begin
+        case (alu_op)
+            2'b00: alu_ctrl = 3'b001; // OR (para ori)
+            2'b01: alu_ctrl = 3'b110; // SUB (beq)
+            2'b10: begin // R-type
+                case (funct)
+                    6'b100000: alu_ctrl = 3'b010; // ADD
+                    6'b100010: alu_ctrl = 3'b110; // SUB
+                    6'b100100: alu_ctrl = 3'b000; // AND
+                    6'b100101: alu_ctrl = 3'b001; // OR
+                    6'b101010: alu_ctrl = 3'b111; // SLT
+                    default:   alu_ctrl = 3'b010;
+                endcase
+            end
+            default: alu_ctrl = 3'b010;
+        endcase
+    end
+endmodule
+
+// ==================================================
+// ALU com Operação OR
+// ==================================================
+module alu (
+    input wire [31:0] a,
+    input wire [31:0] b,
+    input wire [2:0] alu_control,
+    output reg [31:0] result,
+    output reg zero
+);
+    always @(*) begin
+        case (alu_control)
+            3'b000: result = a & b;
+            3'b001: result = a | b;
+            3'b010: result = a + b;
+            3'b110: result = a - b;
+            3'b111: result = (a < b) ? 32'd1 : 32'd0;
+            default: result = 32'd0;
+        endcase
+        zero = (result == 32'd0);
+    end
+endmodule
+
+// ==================================================
+// Banco de Registradores (Registrador $zero fixo)
 // ==================================================
 module register_file (
     input wire clk,
-    input wire we,                     // Write Enable
-    input wire [4:0] read_reg1,        // Endereço do primeiro registrador a ser lido
-    input wire [4:0] read_reg2,        // Endereço do segundo registrador a ser lido
-    input wire [4:0] write_reg,        // Endereço do registrador a ser escrito
-    input wire [31:0] write_data,      // Dados a serem escritos
-    output wire [31:0] read_data1,     // Saída dos dados do registrador 1
-    output wire [31:0] read_data2      // Saída dos dados do registrador 2
+    input wire we,
+    input wire [4:0] read_reg1,
+    input wire [4:0] read_reg2,
+    input wire [4:0] write_reg,
+    input wire [31:0] write_data,
+    output wire [31:0] read_data1,
+    output wire [31:0] read_data2
 );
-
     reg [31:0] registers [31:0];
-
+    
     integer i;
-    // Inicializa os registradores (opcional)
     initial begin
-        for (i = 0; i < 32; i = i + 1)
-            registers[i] = 32'd0;
+        for (i = 0; i < 32; i = i + 1) registers[i] = 32'd0;
     end
 
-    // Escrita no registrador
     always @(posedge clk) begin
-        if (we)
-            registers[write_reg] <= write_data;
+        if (we && (write_reg != 0)) registers[write_reg] <= write_data;
     end
 
-    // Leitura dos registradores
-    assign read_data1 = registers[read_reg1];
-    assign read_data2 = registers[read_reg2];
-
+    assign read_data1 = (read_reg1 == 0) ? 32'd0 : registers[read_reg1];
+    assign read_data2 = (read_reg2 == 0) ? 32'd0 : registers[read_reg2];
 endmodule
+
 // ==================================================
+// Módulo Top-Level (MIPS Completo)
+// ==================================================
+module mips (
+    input wire clk,
+    input wire reset
+);
+    wire [31:0] pc, instruction, read_data1, read_data2;
+    wire [4:0] write_reg;
+    wire [31:0] write_data, alu_result, sign_extended;
+    wire alu_zero, reg_dst, alu_src, mem_to_reg, reg_write;
+    wire mem_read, mem_write, branch, jump;
+    wire [1:0] alu_op;
+    wire [2:0] alu_ctrl;
+    wire [31:0] alu_operand2, mem_read_data;
+
+    // Cálculo do próximo PC
+    wire [31:0] pc_plus_4 = pc + 32'd4;
+    wire [31:0] branch_target = pc_plus_4 + (sign_extended << 2);
+    wire [31:0] jump_target = {pc_plus_4[31:28], instruction[25:0] << 2};
+    wire branch_taken = branch & alu_zero;
+    wire [31:0] pc_branch, pc_next;
+
+    // Instanciações
+    program_counter pc_module (clk, reset, pc_next, pc);
+    instruction_memory imem (pc, instruction);
+    control_unit ctrl (instruction[31:26], reg_dst, alu_src, mem_to_reg, reg_write, mem_read, mem_write, branch, alu_op, jump);
+    alu_control alu_ctrl_unit (alu_op, instruction[5:0], alu_ctrl);
+    register_file reg_file (clk, reg_write, instruction[25:21], instruction[20:16], write_reg, write_data, read_data1, read_data2);
+    
+    mux2to1 #(5) mux_reg_dst (instruction[20:16], instruction[15:11], reg_dst, write_reg);
+    sign_extender sign_ext (instruction[15:0], sign_extended);
+    mux2to1 mux_alu_src (read_data2, sign_extended, alu_src, alu_operand2);
+    alu alu_unit (read_data1, alu_operand2, alu_ctrl, alu_result, alu_zero);
+    data_memory dmem (clk, alu_result, read_data2, mem_read, mem_write, mem_read_data);
+    mux2to1 mux_mem_to_reg (alu_result, mem_read_data, mem_to_reg, write_data);
+    mux2to1 mux_branch (pc_plus_4, branch_target, branch_taken, pc_branch);
+    mux2to1 mux_jump (pc_branch, jump_target, jump, pc_next);
+endmodule
