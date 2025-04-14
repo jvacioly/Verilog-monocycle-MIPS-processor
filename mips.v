@@ -1,6 +1,7 @@
 // ==================================================
 // Program Counter (PC)
 // ==================================================
+`timescale 1ns / 1ps // escala de tempo de 1 ns com precisão de 1 pico segundo
 module program_counter (
     input wire clk,
     input wire reset,
@@ -40,10 +41,7 @@ module instruction_memory (
         memory[14] = 32'h00000000; // nop
         memory[15] = 32'h00000000; // nop
     end
-    
-    always @(*) begin
-        instruction = memory[pc[5:2]];
-    end
+    assign instruction = memory[pc[5:2]]; //memoria de leitura apenas (ROM)
 endmodule
 
 // ==================================================
