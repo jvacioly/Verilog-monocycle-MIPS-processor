@@ -155,7 +155,6 @@ localparam [3:0]
     XOR  = 4'b1101,
     SLL  = 4'b1110,
     SRL  = 4'b1111,
-    LUI  = 4'b1000,
     ORI  = 4'b1001,
     ANDI = 4'b1010,
     XORI = 4'b1011;
@@ -179,11 +178,10 @@ always @(*) begin
             endcase
         end
         2'b11: begin             // I-type (usa parte do opcode)
-            case (funct[5:3])    // Simplificação para exemplificação
+            case (funct)    // Simplificação para exemplificação
                 3'b001: alu_ctrl = ORI;   // ori
                 3'b010: alu_ctrl = ANDI;  // andi
                 3'b011: alu_ctrl = XORI;  // xori
-                3'b100: alu_ctrl = LUI;   // lui
                 default: alu_ctrl = ADD;
             endcase
         end
@@ -198,21 +196,39 @@ endmodule
 module alu (
     input wire [31:0] a,
     input wire [31:0] b,
-    input wire [2:0] alu_control,
-    output reg [31:0] result,
+    input wire [3:0] alu_ctrl,
+    output reg [31:0] alu_result,
     output reg zero
 );
-    always @(*) begin
-        case (alu_control)
-            3'b000: result = a & b;
-            3'b001: result = a | b;
-            3'b010: result = a + b;
-            3'b110: result = a - b;
-            3'b111: result = (a < b) ? 32'd1 : 32'd0;
-            default: result = 32'd0;
-        endcase
-        zero = (result == 32'd0);
-    end
+   always @(*) begin
+    case (alu_ctrl)
+        // Operações Aritméticas
+        ADD:  alu_result = a + b;
+        SUB:  alu_result = a - b;
+        
+        // Operações Lógicas
+        AND:  alu_result = a & b;
+        OR:   alu_result = a | b;
+        NOR:  alu_result = ~(a | b);
+        XOR:  alu_result = a ^ b;
+        
+        // Comparação
+        SLT:  alu_result = ($signed(a) < $signed(b)) ? 32'd1 : 32'd0;
+        
+        // Shifts
+        SLL:  alu_result = a << b[4:0];  // Shift left lógico (usa 5 LSBs de b)
+        SRL:  alu_result = a >> b[4:0];  // Shift right lógico
+        
+        // Instruções I-type
+        ORI:  alu_result = a | b;             // OR com imediato
+        ANDI: alu_result = a & b;             // AND com imediato
+        XORI: alu_result = a ^ b;             // XOR com imediato
+        
+        // Default: ADD para lw/sw/addi
+        default: alu_result = a + b;
+    endcase
+end
+
 endmodule
 
 // ==================================================
