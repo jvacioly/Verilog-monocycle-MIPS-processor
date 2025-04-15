@@ -1,7 +1,7 @@
 // ==================================================
 // Program Counter (PC)
 // ==================================================
-`timescale 1ns / 1ps // escala de tempo de 1 ns com precisão de 1 pico segundo
+`timescale 1ns / 1ps // escala de tempo de 1 ns com precisão de 1 pico
 module program_counter (
     input wire clk,
     input wire reset,
@@ -41,7 +41,9 @@ module instruction_memory (
         memory[14] = 32'h00000000; // nop
         memory[15] = 32'h00000000; // nop
     end
-    assign instruction = memory[pc[5:2]]; //memoria de leitura apenas (ROM)
+    
+    assign instruction = memory[pc[5:2]]; // memoria de leitura (rom)
+    
 endmodule
 
 // ==================================================
@@ -136,58 +138,30 @@ module control_unit (
 endmodule
 
 // ==================================================
-// Unidade de Controle da ALU
+// Unidade de Controle da ALU (Atualizada para OR)
 // ==================================================
 module alu_control (
     input wire [1:0] alu_op,
     input wire [5:0] funct,
-    output reg [3:0] alu_ctrl  // Expandido para 4 bits para suportar mais operações
+    output reg [2:0] alu_ctrl
 );
-
-// Codificação completa das operações da ALU
-localparam [3:0]
-    AND  = 4'b0000,
-    OR   = 4'b0001,
-    ADD  = 4'b0010,
-    SUB  = 4'b0110,
-    SLT  = 4'b0111,
-    NOR  = 4'b1100,
-    XOR  = 4'b1101,
-    SLL  = 4'b1110,
-    SRL  = 4'b1111,
-    ORI  = 4'b1001,
-    ANDI = 4'b1010,
-    XORI = 4'b1011;
-
-always @(*) begin
-    case (alu_op)
-        2'b00: alu_ctrl = ADD;   // ADD para lw, sw, addi
-        2'b01: alu_ctrl = SUB;   // SUB para beq/bne
-        2'b10: begin             // R-type (usa funct)
-            case (funct)
-                6'b100000: alu_ctrl = ADD;  // ADD
-                6'b100010: alu_ctrl = SUB;  // SUB
-                6'b100100: alu_ctrl = AND;  // AND
-                6'b100101: alu_ctrl = OR;   // OR
-                6'b100110: alu_ctrl = XOR;  // XOR
-                6'b100111: alu_ctrl = NOR;  // NOR
-                6'b101010: alu_ctrl = SLT;  // SLT
-                6'b000000: alu_ctrl = SLL;  // SLL
-                6'b000010: alu_ctrl = SRL;  // SRL
-                default:   alu_ctrl = ADD;
-            endcase
-        end
-        2'b11: begin             // I-type (usa parte do opcode)
-            case (funct)    // Simplificação para exemplificação
-                3'b001: alu_ctrl = ORI;   // ori
-                3'b010: alu_ctrl = ANDI;  // andi
-                3'b011: alu_ctrl = XORI;  // xori
-                default: alu_ctrl = ADD;
-            endcase
-        end
-        default: alu_ctrl = ADD;
-    endcase
-end
+    always @(*) begin
+        case (alu_op)
+            2'b00: alu_ctrl = 3'b001; // OR (para ori)
+            2'b01: alu_ctrl = 3'b110; // SUB (beq)
+            2'b10: begin // R-type
+                case (funct)
+                    6'b100000: alu_ctrl = 3'b010; // ADD
+                    6'b100010: alu_ctrl = 3'b110; // SUB
+                    6'b100100: alu_ctrl = 3'b000; // AND
+                    6'b100101: alu_ctrl = 3'b001; // OR
+                    6'b101010: alu_ctrl = 3'b111; // SLT
+                    default:   alu_ctrl = 3'b010;
+                endcase
+            end
+            default: alu_ctrl = 3'b010;
+        endcase
+    end
 endmodule
 
 // ==================================================
@@ -196,39 +170,21 @@ endmodule
 module alu (
     input wire [31:0] a,
     input wire [31:0] b,
-    input wire [3:0] alu_ctrl,
-    output reg [31:0] alu_result,
+    input wire [2:0] alu_control,
+    output reg [31:0] result,
     output reg zero
 );
-   always @(*) begin
-    case (alu_ctrl)
-        // Operações Aritméticas
-        ADD:  alu_result = a + b;
-        SUB:  alu_result = a - b;
-        
-        // Operações Lógicas
-        AND:  alu_result = a & b;
-        OR:   alu_result = a | b;
-        NOR:  alu_result = ~(a | b);
-        XOR:  alu_result = a ^ b;
-        
-        // Comparação
-        SLT:  alu_result = ($signed(a) < $signed(b)) ? 32'd1 : 32'd0;
-        
-        // Shifts
-        SLL:  alu_result = a << b[4:0];  // Shift left lógico (usa 5 LSBs de b)
-        SRL:  alu_result = a >> b[4:0];  // Shift right lógico
-        
-        // Instruções I-type
-        ORI:  alu_result = a | b;             // OR com imediato
-        ANDI: alu_result = a & b;             // AND com imediato
-        XORI: alu_result = a ^ b;             // XOR com imediato
-        
-        // Default: ADD para lw/sw/addi
-        default: alu_result = a + b;
-    endcase
-end
-
+    always @(*) begin
+        case (alu_control)
+            3'b000: result = a & b;
+            3'b001: result = a | b;
+            3'b010: result = a + b;
+            3'b110: result = a - b;
+            3'b111: result = (a < b) ? 32'd1 : 32'd0;
+            default: result = 32'd0;
+        endcase
+        zero = (result == 32'd0);
+    end
 endmodule
 
 // ==================================================
