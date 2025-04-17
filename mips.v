@@ -4,10 +4,10 @@
 // ALU Control
 // ==================================================
 module ALU_Control (
-    input  wire [1:0] alu_op,
-    input  wire [5:0] opcode,
-    input  wire [5:0] funct,
-    output reg  [3:0] alu_ctrl
+    input  wire [1:0] alu_op, // Entrada dos Casos
+    input  wire [5:0] opcode, // Comando Operacional
+    input  wire [5:0] funct, // Função
+    output reg  [3:0] alu_ctrl // Controle da Operação Lógica/Aritmética
 );
     always @(*) begin
         case (alu_op)
@@ -27,7 +27,7 @@ module ALU_Control (
             end
             2'b11: begin // Tipo I
                 case (opcode)
-                    6'b001000: alu_ctrl = 4'b0010; // addi (treated as ADD)
+                    6'b001000: alu_ctrl = 4'b0010; // addi
                     6'b001010: alu_ctrl = 4'b0111; // slti
                     6'b001100: alu_ctrl = 4'b0000; // andi
                     6'b001101: alu_ctrl = 4'b0001; // ori
