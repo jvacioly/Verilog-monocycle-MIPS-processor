@@ -1,84 +1,74 @@
 `timescale 1ns / 1ps
 
-module mips_testbench;
-    // Inputs
+module tb_mips;
+    // Clock & reset
     reg clk;
     reg reset;
 
-    // Outputs
+    // Instantiate the processor
     wire [31:0] pc;
-    wire reg_write;
-    wire alu_src;
-    wire [31:0] instruction; // Add wire for the current instruction
-    wire [31:0] registers [0:31];
-    wire [31:0] data_memory [0:255]; // Add wire for the data memory
-
-    // Instantiate the MIPS processor
+    wire        reg_write;
+    wire        alu_src;
     mips uut (
-        .clk(clk),
-        .reset(reset),
-        .pc(pc),
+        .clk      (clk),
+        .reset    (reset),
+        .pc       (pc),
         .reg_write(reg_write),
-        .alu_src(alu_src),
-        .registers(registers)
+        .alu_src  (alu_src)
     );
 
-    // Connect instruction memory to fetch the current instruction
-    instruction_memory imem (
-        .pc(pc),
-        .instruction(instruction) // Fetch the instruction at the current PC
-    );
+    // Cycle counter
+    integer cycle_count = 0;
+    integer i, j;
 
-    // Connect the data memory to observe changes
-    data_memory dmem (
-        .clk(clk),
-        .address(uut.alu_result), // Use ALU result as the address
-        .write_data(uut.read_data2),
-        .mem_read(uut.mem_read),
-        .mem_write(uut.mem_write),
-        .read_data(data_memory) // Expose all data memory
-    );
-
-    // Clock generation
+    // Generate clock: 10 ns period
     initial begin
         clk = 0;
-        forever #5 clk = ~clk; // 10ns clock period
+        forever #5 clk = ~clk;
     end
 
-    // Stimulus
+    // Apply reset then release
     initial begin
-        // Initialize reset
         reset = 1;
-        #10; // Wait 10ns
+        #12;     // hold reset for a bit more than one full cycle
         reset = 0;
-
-        // Wait for the simulation to run for a specific duration
-        #1000; // Run for sufficient time to execute instructions
-        
-        $stop; // Terminate the simulation
     end
 
-    // Detect infinite loop and terminate simulation
+    // Dump waveforms
+    initial begin
+        $dumpfile("tb_mips.vcd");
+        $dumpvars(0, tb_mips);
+    end
+
+    // On each rising edge, display PC, registers and data memory
     always @(posedge clk) begin
-        if (pc == 32'h3C) begin // Check if PC has reached the infinite loop address (e.g., "j 0xF" -> PC = 0x3C)
-            $display("Infinite loop detected at PC = %h. Terminating simulation.", pc);
-            $stop;
+        if (!reset) begin
+            cycle_count = cycle_count + 1;
+            $display("=== Cycle %0d ===", cycle_count);
+            $display("PC = 0x%08h", uut.pc);
+
+            // Display non-zero registers
+            $display("Registers:");
+            for (i = 0; i < 32; i = i + 1) begin
+                if (uut.RF.rf[i] !== 32'd0)
+                    $display("  $%0d = 0x%08h", i, uut.RF.rf[i]);
+            end
+
+            // Display non-zero data memory entries
+            $display("Data Memory (non-zero):");
+            for (j = 0; j < 256; j = j + 1) begin
+                if (uut.DM.memory[j] !== 32'd0)
+                    $display("  Mem[%0d] = 0x%08h", j, uut.DM.memory[j]);
+            end
+
+            $display("");
         end
     end
 
-    // Display contents on every clock edge (Horizontal format)
-    always @(posedge clk) begin
-        $write("PC: %h | Instruction: %h | ", pc, instruction);
-        $write("$zero: %h | $t0: %h | $t1: %h | $t2: %h | $t3: %h | $t4: %h | ", 
-               registers[0], registers[8], registers[9], registers[10], registers[11], registers[12]);
-        
-        // Display data memory changes
-        for (int i = 0; i < 256; i = i + 1) begin
-            if (dmem.memory[i] !== 32'h00000000) begin
-                $write("Mem[%0d]: %h | ", i, dmem.memory[i]);
-            end
-        end 
-        
-        $write("\n");
-    end
+    // Stop simulation after a fixed number of cycles
+    initial begin
+        #1000;
+        $display("Simulation finished.");
+        $finish;
+end
 endmodule
