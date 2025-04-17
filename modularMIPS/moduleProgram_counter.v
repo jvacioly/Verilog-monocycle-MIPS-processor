@@ -1,18 +1,21 @@
-module ProgramCounter (
-    input clk,                   // Sinal de clock que sincroniza a atualização do PC.
-    input reset,                 // Sinal de reset; quando ativo, o PC é zerado.
-    input [31:0] nextPC,         // Próximo endereço de instrução a ser carregado.
-    output reg [31:0] currentPC  // Endereço atual da instrução (contador de programa).
+module Adder (
+    input wire [31:0] addr_in,  // Endereço de entrada
+    input wire [31:0] offset,   // Offset (para branch ou +4)
+    output wire [31:0] addr_out // Endereço resultante
 );
-    // Bloco sempre sensível à borda de subida do clock ou do reset.
-    // Utiliza-se o reset com borda de subida para permitir um reset assíncrono.
-    always @(posedge clk or posedge reset) begin
-        if (reset)
-            // Se o reset estiver ativo, zera o PC (inicialização do contador).
-            currentPC <= 0;
-        else
-            // Caso contrário, atualiza o PC com o valor de nextPC.
-            currentPC <= nextPC;
-    end
+    assign addr_out = addr_in + offset;
+endmodule
 
+module ProgramCounter (
+    input wire clk,          // Clock
+    input wire rst,          // Reset
+    input wire [31:0] pc_in, // Endereço de entrada
+    output reg [31:0] pc_out // Endereço atual
+);
+    always @(posedge clk or posedge rst) begin
+        if (rst)
+            pc_out <= 32'b0;    // Reseta para 0
+        else
+            pc_out <= pc_in;    // Atualiza com pc_in
+    end
 endmodule

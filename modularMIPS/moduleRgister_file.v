@@ -1,18 +1,30 @@
-module ProgramCounter (
-    input clk,                   // Sinal de clock que sincroniza a atualização do PC.
-    input reset,                 // Sinal de reset; quando ativo, o PC é zerado.
-    input [31:0] nextPC,         // Próximo endereço de instrução a ser carregado.
-    output reg [31:0] currentPC  // Endereço atual da instrução (contador de programa).
+module RegisterFile (
+    input wire [4:0] ReadRegister1,  // Endereço do registrador rs
+    input wire [4:0] ReadRegister2,  // Endereço do registrador rt
+    input wire [4:0] WriteRegister,  // Endereço do registrador rd ou rt
+    input wire [31:0] WriteData,     // Dado a ser escrito
+    input wire RegWrite,             // Sinal de controle para escrita
+    input wire clk,                  // Clock
+    output reg [31:0] ReadData1,     // Dado lido de rs
+    output reg [31:0] ReadData2      // Dado lido de rt
 );
-    // Bloco sempre sensível à borda de subida do clock ou do reset.
-    // Utiliza-se o reset com borda de subida para permitir um reset assíncrono.
-    always @(posedge clk or posedge reset) begin
-        if (reset)
-            // Se o reset estiver ativo, zera o PC (inicialização do contador).
-            currentPC <= 0;
-        else
-            // Caso contrário, atualiza o PC com o valor de nextPC.
-            currentPC <= nextPC;
+    reg [31:0] registers [0:31]; // Banco de registradores
+
+    initial begin
+        integer i;
+        for (i = 0; i < 32; i = i + 1) begin
+            registers[i] = 32'b0; // Inicializa todos os registradores com 0
+        end
     end
 
+    always @(*) begin
+        ReadData1 = (ReadRegister1 == 5'b0) ? 32'b0 : registers[ReadRegister1];
+        ReadData2 = (ReadRegister2 == 5'b0) ? 32'b0 : registers[ReadRegister2];
+    end
+
+    always @(posedge clk) begin
+        if (RegWrite && WriteRegister != 5'b0) begin
+            registers[WriteRegister] <= WriteData;
+        end
+    end
 endmodule
