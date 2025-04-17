@@ -1,34 +1,59 @@
 // ==================================================
 // Testbench para o Program Counter
 // ==================================================
-module tb_program_counter;
-    reg clk, reset;
-    wire [31:0] pc;
-    
-    program_counter uut (
+`timescale 1ns / 1ps
+
+module ProgramCounter_tb;
+    reg clk;
+    reg reset;
+    reg [31:0] nextPC;
+
+    wire [31:0] currentPC;
+
+    ProgramCounter uut (
         .clk(clk),
         .reset(reset),
-        .pc_next(pc + 4),  // Próximo PC = PC atual + 4
-        .pc(pc)
+        .nextPC(nextPC),
+        .currentPC(currentPC)
     );
-    
-    always #5 clk = ~clk;
-    
+
     initial begin
-        $display("\n=== [TESTBENCH] Program Counter ===");
-        clk = 0; reset = 1;
-        #10 reset = 0;
-        
-        $display("Reset: PC = 0x%08h", pc);
-        
-        // Verifica 3 incrementos
-        repeat (3) begin
-            #10;
-            $display("Clock %0d: PC = 0x%08h", ($time/10), pc);
-        end
-        
+        clk = 0;
+        reset = 0;
+        nextPC = 0;
+
+        #100;
+
+        // Test case 1: Apply reset
+        reset = 1;
+        #10;
+        $display("Reset applied, currentPC = %h (expected: 00000000)", currentPC);
+        reset = 0;
+
+        // Test case 2: Normal operation
+        nextPC = 32'h00000004;
+        #10; 
+        $display("nextPC = %h, currentPC = %h (expected: %h)", nextPC, currentPC, nextPC);
+
+        nextPC = 32'h00000008;
+        #10; 
+        $display("nextPC = %h, currentPC = %h (expected: %h)", nextPC, currentPC, nextPC);
+
+        // Test case 3: Apply reset again
+        reset = 1;
+        #10;
+        $display("Reset applied again, currentPC = %h (expected: 00000000)", currentPC);
+        reset = 0;
+
+        nextPC = 32'h00000010;
+        #10;
+        $display("nextPC = %h, currentPC = %h (expected: %h)", nextPC, currentPC, nextPC);
+
         $finish;
     end
+
+    always #5 clk = ~clk;
+
 endmodule
 
 
